@@ -46,7 +46,7 @@ public class Index {
         }
     }
 
-    private void load() {
+    public void load() {
         if (!indexFile.exists()) {
             return;
         }

@@ -56,7 +56,6 @@ public class CheckoutCommand implements Command {
         byte[] treeData = Files.readAllBytes(treeFile.toPath());
         Tree tree = Tree.deserialize(treeData);
 
-        // Update working directory (SIN BORRAR - solo actualiza archivos tracked)
         updateWorkingDirectorySafe(workingDir, tree.getEntries());
 
         // Update index
@@ -75,7 +74,7 @@ public class CheckoutCommand implements Command {
 
     private boolean hasUncommittedChanges() throws IOException {
         Index index = new Index(store.getIndexFile());
-        
+
         for (Map.Entry<String, String> entry : index.getEntries().entrySet()) {
             File file = new File(entry.getKey());
             if (!file.exists()) {
@@ -90,36 +89,26 @@ public class CheckoutCommand implements Command {
         return false;
     }
 
-    /**
-     * Actualiza el working directory de forma SEGURA
-     * Solo modifica archivos que están en el índice (tracked)
-     * NO borra archivos no rastreados
-     */
     private void updateWorkingDirectorySafe(File workingDir, Map<String, String> treeEntries) throws IOException {
-        // Obtener archivos actualmente en el índice
-        Index currentIndex = new Index(store.getIndexFile());
-        Map<String, String> currentFiles = currentIndex.getEntries();
-
-        // 1. Actualizar/crear archivos de la nueva rama
         for (Map.Entry<String, String> entry : treeEntries.entrySet()) {
-            String path = entry.getKey();
-            String hash = entry.getValue();
-
-            File objectFile = store.getObjectFile(hash);
-            byte[] content = Files.readAllBytes(objectFile.toPath());
-
-            File targetFile = new File(workingDir, path);
+            File targetFile = new File(workingDir, entry.getKey());
             targetFile.getParentFile().mkdirs();
+            byte[] content = Files.readAllBytes(store.getObjectFile(entry.getValue()).toPath());
             Files.write(targetFile.toPath(), content);
         }
 
-        // 2. Solo borrar archivos que estaban tracked y ya no están
-        for (String oldPath : currentFiles.keySet()) {
-            if (!treeEntries.containsKey(oldPath)) {
-                File oldFile = new File(oldPath);
-                if (oldFile.exists()) {
-                    oldFile.delete();
-                    System.out.println("Removed: " + oldPath);
+        deleteUntrackedFiles(workingDir, treeEntries);
+    }
+
+    private void deleteUntrackedFiles(File dir, Map<String, String> treeEntries) throws IOException {
+        for (File f : dir.listFiles()) {
+            if (f.isDirectory()) {
+                deleteUntrackedFiles(f, treeEntries);
+                if (f.list().length == 0) f.delete();
+            } else {
+                String relativePath = workingDir.toPath().relativize(f.toPath()).toString();
+                if (!treeEntries.containsKey(relativePath)) {
+                    f.delete();
                 }
             }
         }

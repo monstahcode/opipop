@@ -44,6 +44,7 @@ public class StashCommand implements Command {
 
     private void stashChanges() throws IOException {
         Index index = new Index(store.getIndexFile());
+        index.load(); // ¡IMPORTANTE: cargar el índice desde el archivo!
         Map<String, String> indexEntries = index.getEntries();
 
         if (indexEntries.isEmpty()) {
@@ -55,7 +56,7 @@ public class StashCommand implements Command {
         List<StashEntry> modifiedFiles = new ArrayList<>();
         for (Map.Entry<String, String> entry : indexEntries.entrySet()) {
             String path = entry.getKey();
-            File file = new File(path);
+            File file = new File(System.getProperty("user.dir"), path); // Usar ruta absoluta
             
             if (!file.exists()) {
                 continue;
@@ -77,6 +78,12 @@ public class StashCommand implements Command {
         // Save stash
         List<StashEntry> existingStash = loadStash();
         existingStash.addAll(0, modifiedFiles);
+        
+        // Marcar el final del batch para el nuevo grupo
+        if (!modifiedFiles.isEmpty()) {
+            modifiedFiles.get(modifiedFiles.size() - 1).isBatchEnd = true;
+        }
+        
         saveStash(existingStash);
 
         // Save objects for stashed files
@@ -89,8 +96,10 @@ public class StashCommand implements Command {
             String path = stashEntry.path;
             String indexHash = indexEntries.get(path);
             File objectFile = store.getObjectFile(indexHash);
-            byte[] content = Files.readAllBytes(objectFile.toPath());
-            Files.write(new File(path).toPath(), content);
+            if (objectFile.exists()) {
+                byte[] content = Files.readAllBytes(objectFile.toPath());
+                Files.write(new File(System.getProperty("user.dir"), path).toPath(), content);
+            }
         }
 
         System.out.println("Saved working directory state (stashed " + modifiedFiles.size() + " file(s))");
@@ -104,7 +113,7 @@ public class StashCommand implements Command {
             return;
         }
 
-        // Find the most recent stash group (all entries with same timestamp/batch)
+        // Find the most recent stash group (all entries until batch end)
         List<StashEntry> toRestore = new ArrayList<>();
         for (StashEntry entry : stash) {
             toRestore.add(entry);
@@ -121,7 +130,7 @@ public class StashCommand implements Command {
                 continue;
             }
             byte[] content = Files.readAllBytes(objectFile.toPath());
-            File targetFile = new File(entry.path);
+            File targetFile = new File(System.getProperty("user.dir"), entry.path); // Ruta absoluta
             targetFile.getParentFile().mkdirs();
             Files.write(targetFile.toPath(), content);
         }
@@ -147,8 +156,21 @@ public class StashCommand implements Command {
             System.out.println("  " + entry.path + " (" + entry.hash.substring(0, 7) + ")");
             if (entry.isBatchEnd) {
                 batchNum++;
+                if (batchNum < countBatches(stash)) {
+                    System.out.println("  ---");
+                }
             }
         }
+    }
+
+    private int countBatches(List<StashEntry> stash) {
+        int count = 0;
+        for (StashEntry entry : stash) {
+            if (entry.isBatchEnd) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private void clearStash() throws IOException {
@@ -172,7 +194,7 @@ public class StashCommand implements Command {
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split(" ", 3);
                 if (parts.length >= 2) {
-                    boolean isBatchEnd = parts.length > 2 && parts[2].equals("END");
+                    boolean isBatchEnd = parts.length > 2 && "END".equals(parts[2]);
                     entries.add(new StashEntry(parts[1], parts[0], null, isBatchEnd));
                 }
             }
@@ -190,8 +212,8 @@ public class StashCommand implements Command {
                 StashEntry entry = entries.get(i);
                 writer.write(entry.hash + " " + entry.path);
                 
-                // Mark the last entry of each batch
-                if (i == entries.size() - 1 || entries.get(i).isBatchEnd) {
+                // Mark batch end
+                if (entry.isBatchEnd) {
                     writer.write(" END");
                 }
                 
@@ -228,7 +250,7 @@ public class StashCommand implements Command {
         boolean isBatchEnd;
 
         StashEntry(String path, String hash, byte[] content) {
-            this(path, hash, content, true);
+            this(path, hash, content, false);
         }
 
         StashEntry(String path, String hash, byte[] content, boolean isBatchEnd) {
