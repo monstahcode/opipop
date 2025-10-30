@@ -34,7 +34,7 @@ class CheckoutCommandTest {
         new File(store.getRefsDir(), "heads").mkdirs();
         Files.writeString(store.getHeadFile().toPath(), "ref: refs/heads/main");
         
-        checkoutCommand = new CheckoutCommand(store);
+        checkoutCommand = new CheckoutCommand(store, workingDir);
     }
 
     @Test

@@ -90,8 +90,18 @@ public class Commit {
                 if (parts.length > 1) {
                     timestamp = Long.parseLong(parts[1]);
                 }
+            } else if (line.isEmpty()) {
+                inMessage = true;
             }
         }
+
+        System.out.println("Deserialized commit:");
+        System.out.println("Tree: " + treeHash);
+        System.out.println("Parent: " + parentHash);
+        System.out.println("Author: " + author);
+        System.out.println("Timestamp: " + timestamp);
+        System.out.println("Message: " + message.toString());
+
 
         Commit commit = new Commit(treeHash, parentHash, message.toString(), author);
         commit.timestamp = timestamp;

@@ -51,7 +51,7 @@ class AddCommandTest {
         String content = "test content";
         Files.writeString(testFile.toPath(), content);
         
-        addCommand.execute(new String[]{"test.txt"});
+        addCommand.execute(new String[]{String.valueOf(testFile.getAbsoluteFile())});
         
         String hash = HashUtils.sha1(content.getBytes());
         File objectFile = store.getObjectFile(hash);
@@ -68,7 +68,7 @@ class AddCommandTest {
         Files.writeString(file1.toPath(), "content1");
         Files.writeString(file2.toPath(), "content2");
         
-        addCommand.execute(new String[]{"file1.txt", "file2.txt"});
+        addCommand.execute(new String[]{file1.getAbsolutePath(), file2.getAbsolutePath()});
         
         String hash1 = HashUtils.sha1("content1".getBytes());
         String hash2 = HashUtils.sha1("content2".getBytes());
@@ -97,7 +97,7 @@ class AddCommandTest {
             deleteDirectory(objectsDir);
         }
         
-        addCommand.execute(new String[]{"test.txt"});
+        addCommand.execute(new String[]{String.valueOf(testFile.getAbsoluteFile())});
         
         assertTrue(objectsDir.exists());
     }
@@ -108,8 +108,8 @@ class AddCommandTest {
         byte[] binaryContent = new byte[]{0x00, 0x01, 0x02, (byte) 0xFF};
         Files.write(testFile.toPath(), binaryContent);
         
-        addCommand.execute(new String[]{"binary.dat"});
-        
+        addCommand.execute(new String[]{String.valueOf(testFile.getAbsoluteFile())});
+
         String hash = HashUtils.sha1(binaryContent);
         File objectFile = store.getObjectFile(hash);
         assertTrue(objectFile.exists());

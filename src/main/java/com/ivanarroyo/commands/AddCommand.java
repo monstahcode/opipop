@@ -35,6 +35,7 @@ public class AddCommand implements Command {
 
     private void addFile(String filePath) throws IOException {
         Path path = Path.of(filePath);
+        path = path.toAbsolutePath().normalize();
         if (!Files.exists(path) || !Files.isRegularFile(path)) {
             System.out.println("File not found: " + filePath);
             return;
